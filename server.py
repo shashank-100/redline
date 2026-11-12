@@ -132,33 +132,65 @@ def chat_json(system, user, deadline, max_tokens=4000):
 
 # ---------------------------------------------------------------- playbook
 
+def _find_rules(obj):
+    """Locate the rule list in any reasonable playbook shape."""
+    if isinstance(obj, list) and obj and all(isinstance(x, dict) for x in obj):
+        return obj
+    if isinstance(obj, dict):
+        for k in sorted(obj, key=lambda k: (0 if re.search(r"rule|position|clause|term", str(k), re.I) else 1)):
+            found = _find_rules(obj[k])
+            if found:
+                return found
+        vals = list(obj.values())
+        if vals and all(isinstance(v, dict) for v in vals):  # {"Term": {...}, ...}
+            return [dict({"heading": k}, **v) for k, v in obj.items()]
+    return None
+
+
 def load_playbook():
-    files = sorted(glob.glob(os.path.join(ROOT, "playbook", "*.json")))
+    files = sorted(glob.glob(os.path.join(ROOT, "playbook", "*.json")),
+                   key=lambda f: (0 if "playbook" in os.path.basename(f).lower() else 1, f))
     if not files:
         raise RuntimeError("no playbook JSON found in ./playbook/")
-    with open(files[0]) as f:
+    with open(files[0], encoding="utf-8") as f:
         pb = json.load(f)
-    rules = pb.get("rules") if isinstance(pb, dict) else pb
-    meta = {k: v for k, v in pb.items() if k != "rules"} if isinstance(pb, dict) else {}
+    rules = _find_rules(pb) or []
+    if not rules:
+        raise RuntimeError("playbook contains no rules")
+    meta = {k: v for k, v in pb.items() if not _find_rules(v)} if isinstance(pb, dict) else {}
+    ids = [rule_id(r, i) for i, r in enumerate(rules)]
+    if len(set(map(str, ids))) != len(ids):  # ids must be unique to key results
+        rules = [dict(r, rule=i + 1) for i, r in enumerate(rules)]
     return meta, rules, os.path.basename(files[0])
 
 
+def _field(rule, patterns, exclude=None):
+    for k, v in rule.items():
+        lk = str(k).lower()
+        if any(p in lk for p in patterns) and not (exclude and any(e in lk for e in exclude)):
+            return v
+    return None
+
+
 def rule_id(rule, idx):
-    for k in ("rule", "id", "number", "rule_id"):
-        if k in rule:
+    for k in ("rule", "id", "number", "rule_id", "rule_number", "no"):
+        if k in rule and isinstance(rule[k], (int, str)):
             return rule[k]
     return idx + 1
 
 
 def rule_heading(rule):
-    for k in ("heading", "title", "name", "topic"):
-        if k in rule:
+    for k in ("heading", "title", "name", "topic", "clause", "subject"):
+        if isinstance(rule.get(k), str):
             return rule[k]
-    return ""
+    v = _field(rule, ["heading", "title", "topic"])
+    return v if isinstance(v, str) else ""
 
 
 def rule_fallbacks(rule):
-    fb = rule.get("fallbacks") or rule.get("fallback_positions") or rule.get("alternates") or []
+    fb = _field(rule, ["fallback", "alternat"])
+    if not fb:
+        return []
     return fb if isinstance(fb, list) else [fb]
 
 
@@ -168,13 +200,15 @@ HEADING_RE = re.compile(
     r"^\s*(?:"
     r"(?:ARTICLE|Article|SECTION|Section|EXHIBIT|Exhibit|SCHEDULE|Schedule|ANNEX|Annex|APPENDIX|Appendix|"
     r"ATTACHMENT|Attachment|ORDER FORM|Order Form|AMENDMENT|Amendment|ADDENDUM|Addendum|"
-    r"STATEMENT OF WORK|Statement of Work|RIDER|Rider)\b"
+    r"STATEMENT OF WORK|Statement of Work|RIDER|Rider|SIDE LETTER|Side Letter|SUPPLEMENT|Supplement|"
+    r"CHANGE ORDER|Change Order)\b"
     r"|\d+(?:\.\d+)*[.)]\s+\S"
     r"|[A-Z]{1,3}-\d+(?:\.\d+)*[.)]?\s"
     r")"
 )
 CONTAINER_RE = re.compile(
-    r"^\s*(EXHIBIT|SCHEDULE|ANNEX|APPENDIX|ATTACHMENT|ORDER FORM|AMENDMENT|ADDENDUM|STATEMENT OF WORK|RIDER)\b",
+    r"^\s*(EXHIBIT|SCHEDULE|ANNEX|APPENDIX|ATTACHMENT|ORDER FORM|AMENDMENT|ADDENDUM|STATEMENT OF WORK|RIDER|"
+    r"SIDE LETTER|SUPPLEMENT|CHANGE ORDER)\b",
     re.I,
 )
 
@@ -261,17 +295,19 @@ STAGE_A_SYSTEM = (
 )
 
 
+def _clip(v, n=700):
+    if isinstance(v, str):
+        return v if len(v) <= n else v[:n] + "..."
+    if isinstance(v, list):
+        return [_clip(x, n) for x in v]
+    if isinstance(v, dict):
+        return {k: _clip(x, n) for k, x in v.items()}
+    return v
+
+
 def rules_brief(rules):
-    out = []
-    for i, r in enumerate(rules):
-        out.append({
-            "rule": rule_id(r, i),
-            "heading": rule_heading(r),
-            "starting_position": r.get("starting_position", ""),
-            "fallbacks": rule_fallbacks(r),
-            "not_acceptable": r.get("not_acceptable", ""),
-        })
-    return out
+    """Schema-agnostic: every field of every rule, long text clipped."""
+    return [dict({"rule": rule_id(r, i)}, **{k: _clip(v) for k, v in r.items()}) for i, r in enumerate(rules)]
 
 
 def windows(segs):
@@ -345,7 +381,7 @@ def keyword_hits(rules, segs):
 STAGE_B_SYSTEM = """You are a senior contracts lawyer reviewing an inbound draft against ONE rule of your company's playbook.
 
 Decide the rule's status on the EFFECTIVE terms of the draft: read the body clause together with every order form, exhibit, schedule, amendment, and precedence or "notwithstanding" clause provided. A later or controlling document that changes the term changes the effective term. If any controlling document pushes the term outside the approved positions, the effective term is outside them.
-Only operative documents count. Material the draft itself marks as superseded, terminated, expired, of no force or effect, a prior agreement, a draft, or attached for reference only does NOT form part of the effective terms; ignore it for the status (you may mention it). Likewise a provision limited by its own terms to a narrow scope (e.g. one exhibit's subject) still counts for that scope.
+Only operative documents count. The draft under review is itself operative (its title may say DRAFT; that is expected). Separate material inside it that the draft marks as superseded, terminated, expired, of no force or effect, a prior agreement, an unexecuted or proposed version, or attached for reference only does NOT form part of the effective terms; ignore it for the status (you may mention it). Likewise a provision limited by its own terms to a narrow scope (e.g. one exhibit's subject) still counts for that scope.
 
 Statuses (exactly one):
 - "accepted": the effective terms conform to the rule's starting position (substance matters, not wording; equivalent phrasing is fine; terms more favorable to our company on every axis the rule addresses also conform).
@@ -401,7 +437,7 @@ def stage_b(meta, rule, idx, cand, prec, deadline):
     prec_ctx = [r for _, r in sorted(prec_ctx)]
 
     user = (
-        "PLAYBOOK CONTEXT:\n" + json.dumps({k: v for k, v in meta.items() if k in ("name", "preamble", "scope")}, indent=1)
+        "PLAYBOOK CONTEXT:\n" + json.dumps(_clip(meta, 3000), indent=1)
         + "\n\nRULE UNDER REVIEW:\n" + json.dumps(rule, indent=1)
         + "\n\nRELEVANT DRAFT SEGMENTS (located across the whole draft, in document order):\n"
         + ("\n\n".join(ctx) if ctx else "(none found anywhere in the draft)")
@@ -516,7 +552,7 @@ def review(contract):
     hits, a_failed = stage_a(rules, segs, deadline - 150)
     kw = keyword_hits(rules, segs)
     prec = sorted((s for s in segs if PRECEDENCE_RE.search(s["text"])), key=precedence_rank)
-    override_docs = [s for s in segs if re.search(r"AMENDMENT|ADDENDUM|SIDE LETTER", s["container"] or s["heading"], re.I)]
+    override_docs = [s for s in segs if re.search(r"AMENDMENT|SIDE LETTER|CHANGE ORDER|SUPPLEMENT", s["container"] or s["heading"], re.I)]
     intro = {}  # container label -> id of its opening segment (carries status like "superseded")
     for s_ in segs:
         if s_["container"] and s_["container"] not in intro:
