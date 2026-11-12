@@ -1,0 +1,131 @@
+{
+  "name": "Corvessa — MSA Standards Playbook",
+  "maintained_by": "Corvessa Legal (H. Ostrowski, General Counsel)",
+  "preamble": "These rules govern review of inbound Master Services Agreements on counterparty paper. Each rule states our starting position, the fallbacks we have approved, and language we do not sign. Positions are Corvessa's own; do not substitute market practice for a rule.",
+  "scope": "The rules below cover the terms this team negotiates. Standard boilerplate on market form is pre-cleared and needs no finding: definitions, services descriptions, mutual indemnification, mutual confidentiality, service-level exhibits remedied by service credits, support terms, acceptable use policies, security and data-protection addenda on customary terms, order-form commercial mechanics (invoicing, co-terming, purchase-order boilerplate), and general provisions (notices, severability, force majeure, counterparts). A term outside both the rules and this pre-cleared list is outside this playbook's scope and takes no status under it. A rule with no corresponding clause anywhere in the draft is not applicable to that draft; report it as such rather than forcing a match.",
+  "rules": [
+    {
+      "rule": 1,
+      "heading": "Term and Renewal",
+      "starting_position": "Automatic renewal in twenty-four (24)-month increments unless notice is given ninety (90) days before the end of the term.",
+      "example_language": "This Agreement begins on the Effective Date and continues for an initial term of twelve (12) months. Thereafter it renews automatically for successive twenty-four (24)-month terms unless either party gives written notice of non-renewal at least ninety (90) days before the end of the then-current term.",
+      "fallbacks": [
+        "Accepting a sixty (60)-day non-renewal notice window.",
+        "Dropping automatic renewal entirely in favor of renewal by written agreement."
+      ],
+      "not_acceptable": "A unilateral customer right to renew at locked pricing beyond a single renewal term.",
+      "guidance": "Fallbacks apply only where the counterparty will not take the starting position, in order. Anything beyond the last fallback, or in not-acceptable territory, is not accepted; propose replacement language that conforms to this rule. Renewal mechanics are frequently restated in order forms. Review the renewal position on the effective terms."
+    },
+    {
+      "rule": 2,
+      "heading": "Non-Solicitation",
+      "starting_position": "A mutual employee non-solicit of twelve (12) months carrying a carve-out for general advertisements.",
+      "example_language": "During the term of this Agreement and for twelve (12) months thereafter, neither party will directly solicit for employment any employee of the other party with whom it had material contact in connection with this Agreement. General advertisements and responses to them are not a breach of this Section.",
+      "fallbacks": [
+        "Dropping the section entirely where the counterparty pushes."
+      ],
+      "not_acceptable": "A one-sided restriction binding only Corvessa, or any term approaching twenty-four (24) months.",
+      "guidance": "Fallbacks apply only where the counterparty will not take the starting position, in order. Anything beyond the last fallback, or in not-acceptable territory, is not accepted; propose replacement language that conforms to this rule."
+    },
+    {
+      "rule": 3,
+      "heading": "Fees and Payment",
+      "starting_position": "Payment within fifteen (15) days of invoice, with late balances accruing 1.0% monthly.",
+      "example_language": "Customer will pay all undisputed fees within fifteen (15) days of the date of each invoice. Amounts not paid when due will accrue interest at 1.0% per month or the maximum rate permitted by law, whichever is less. Customer is responsible for all taxes arising from its purchases under this Agreement, excluding taxes on Provider's net income.",
+      "fallbacks": [
+        "Extending terms to thirty (30) days where the customer's procurement rules demand it.",
+        "Net-45 payment terms for enterprise accounts."
+      ],
+      "not_acceptable": "Ninety-day terms, or payment conditioned on acceptance of the Services.",
+      "guidance": "Fallbacks apply only where the counterparty will not take the starting position, in order. Anything beyond the last fallback, or in not-acceptable territory, is not accepted; propose replacement language that conforms to this rule. Check amendments and order-form invoicing terms before concluding the payment position; the body clause is not always the operative one."
+    },
+    {
+      "rule": 4,
+      "heading": "Intellectual Property",
+      "starting_position": "Full retention of platform intellectual property, with customers taking a license to outputs and assigning feedback to Corvessa.",
+      "example_language": "Provider and its licensors retain all right, title, and interest in and to the Platform, the Services, the Documentation, and all improvements, modifications, and derivative works of any of them. Customer receives no rights except the subscriptions and licenses expressly granted. Customer hereby assigns to Provider all right, title, and interest in any feedback or suggestions relating to the Platform or Services.",
+      "fallbacks": [
+        "Letting the customer own Work Product built solely for it under a statement of work, while Corvessa keeps the platform, background technology, and residual knowledge."
+      ],
+      "not_acceptable": "Assignment or joint ownership of platform IP, or blanket work-made-for-hire treatment.",
+      "guidance": "Fallbacks apply only where the counterparty will not take the starting position, in order. Anything beyond the last fallback, or in not-acceptable territory, is not accepted; propose replacement language that conforms to this rule."
+    },
+    {
+      "rule": 5,
+      "heading": "Audit",
+      "starting_position": "One audit per year on fifteen (15) business days' notice, limited to records, with a current SOC 2 report satisfying the right.",
+      "example_language": "No more than once in any twelve (12) month period, and on at least fifteen (15) business days' written notice, Customer may audit Provider's records directly relating to the fees charged under this Agreement, at Customer's expense and during normal business hours. Audits do not include access to Provider's systems, facilities used for other customers, or other customers' data. Delivery of Provider's then-current SOC 2 Type II report satisfies Customer's audit rights for the applicable period.",
+      "fallbacks": [
+        "Allowing a second annual audit where the customer's regulators require it."
+      ],
+      "not_acceptable": "On-demand audit rights, or any audit reaching production systems.",
+      "guidance": "Fallbacks apply only where the counterparty will not take the starting position, in order. Anything beyond the last fallback, or in not-acceptable territory, is not accepted; propose replacement language that conforms to this rule."
+    },
+    {
+      "rule": 6,
+      "heading": "Termination",
+      "starting_position": "Termination for convenience on sixty (60) days' written notice, with fees payable through the effective date and no refund of prepaid amounts.",
+      "example_language": "Customer may terminate this Agreement for convenience on sixty (60) days' prior written notice. On such termination, Customer will pay all fees accrued through the effective date of termination. Prepaid fees are non-refundable. Either party may terminate for the other's material breach not cured within thirty (30) days of written notice.",
+      "fallbacks": [
+        "Shortening the notice period to thirty (30) days and refunding prepaid, unused fees pro rata."
+      ],
+      "not_acceptable": "Any convenience-termination right that claws back fees already paid for delivered service periods.",
+      "guidance": "Fallbacks apply only where the counterparty will not take the starting position, in order. Anything beyond the last fallback, or in not-acceptable territory, is not accepted; propose replacement language that conforms to this rule."
+    },
+    {
+      "rule": 7,
+      "heading": "Assignment",
+      "starting_position": "Consent-based assignment, Corvessa retaining its affiliate and successor exception.",
+      "example_language": "Neither party may assign this Agreement without the other party's prior written consent, except that Provider may assign this Agreement without consent to an affiliate or in connection with a merger, acquisition, or sale of all or substantially all of its assets. Any other purported assignment is void.",
+      "fallbacks": [
+        "Making the merger-and-sale exception mutual."
+      ],
+      "not_acceptable": "Any customer right to terminate upon a change of control of Corvessa.",
+      "guidance": "Fallbacks apply only where the counterparty will not take the starting position, in order. Anything beyond the last fallback, or in not-acceptable territory, is not accepted; propose replacement language that conforms to this rule."
+    },
+    {
+      "rule": 8,
+      "heading": "Warranties",
+      "starting_position": "A conformance warranty running ninety (90) days from delivery, remedied by re-performance.",
+      "example_language": "Provider warrants that the Services will materially conform to the Documentation for a period of ninety (90) days following delivery. Customer's exclusive remedy for breach of this warranty is re-performance of the affected Services or, if re-performance fails, a refund of the fees paid for the affected Services. EXCEPT AS STATED IN THIS SECTION, THE SERVICES ARE PROVIDED \"AS IS\" AND PROVIDER DISCLAIMS ALL OTHER WARRANTIES, EXPRESS OR IMPLIED.",
+      "fallbacks": [
+        "Extending the warranty window to one hundred eighty (180) days where the remedy stays limited to re-performance."
+      ],
+      "not_acceptable": "A rolling or twelve-month performance warranty that functions as an uptime guarantee.",
+      "guidance": "Fallbacks apply only where the counterparty will not take the starting position, in order. Anything beyond the last fallback, or in not-acceptable territory, is not accepted; propose replacement language that conforms to this rule. A service-level exhibit stating availability targets remedied by service credits is a separate commercial mechanism, not a warranty; it falls under the pre-cleared scope above unless it modifies warranty remedies."
+    },
+    {
+      "rule": 9,
+      "heading": "Pricing Commitments",
+      "starting_position": "Our paper is silent on pricing-parity commitments, and we do not offer them. There is no approved language for this topic.",
+      "example_language": null,
+      "fallbacks": [],
+      "not_acceptable": "Most-favored-nation pricing in any form.",
+      "guidance": "Most-favored-customer pricing in any form is not accepted, and there is no approved replacement language; propose striking the clause. It is unpriceable across the customer base and converts future discounts into retroactive exposure."
+    },
+    {
+      "rule": 10,
+      "heading": "Governing Law",
+      "starting_position": "The laws of Delaware, with exclusive venue in the Delaware courts.",
+      "example_language": "This Agreement is governed by the laws of the State of Delaware, without regard to conflict of laws principles. The state and federal courts located in Delaware have exclusive jurisdiction over any dispute arising out of this Agreement, and each party consents to their jurisdiction.",
+      "fallbacks": [
+        "New York as the governing law.",
+        "Colorado law for counterparties headquartered in that state."
+      ],
+      "not_acceptable": "Any governing law outside our approved set, including non-US law.",
+      "guidance": "Fallbacks apply only where the counterparty will not take the starting position, in order. Anything beyond the last fallback, or in not-acceptable territory, is not accepted; propose replacement language that conforms to this rule. A different governing law appearing anywhere in the document set, including exhibits, is a conflict to surface, not a drafting nit."
+    },
+    {
+      "rule": 11,
+      "heading": "Limitation of Liability",
+      "starting_position": "A mutual limitation of liability equal to the fees paid or payable in the twelve (12) months preceding the claim, with our standard exclusions.",
+      "example_language": "EXCEPT FOR THE EXCLUDED CLAIMS, EACH PARTY'S AGGREGATE LIABILITY ARISING OUT OF OR RELATED TO THIS AGREEMENT WILL NOT EXCEED THE FEES PAID OR PAYABLE BY CUSTOMER IN THE TWELVE (12) MONTHS PRECEDING THE EVENT GIVING RISE TO THE CLAIM. NEITHER PARTY WILL BE LIABLE FOR INDIRECT, INCIDENTAL, SPECIAL, OR CONSEQUENTIAL DAMAGES. \"Excluded Claims\" means a party's indemnification obligations for third-party intellectual property claims, breach of the Confidentiality section of the applicable agreement, Customer's payment obligations, and a party's gross negligence or willful misconduct.",
+      "fallbacks": [
+        "Raising the mutual cap to eighteen (18) months of fees.",
+        "A twenty-four (24)-month cap paired with a two (2)-times super-cap for breaches of data protection obligations."
+      ],
+      "not_acceptable": "Uncapped liability in any form, including any carve-out of the cap for ordinary negligence.",
+      "guidance": "Fallbacks apply only where the counterparty will not take the starting position, in order. Anything beyond the last fallback, or in not-acceptable territory, is not accepted; propose replacement language that conforms to this rule. Watch for cap amounts restated in order forms or exhibits; the effective number is the one that survives the order of precedence."
+    }
+  ]
+}
