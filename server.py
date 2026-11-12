@@ -37,6 +37,8 @@ WINDOW_CHARS = 60000
 MAX_SEG_CHARS = 6000
 RULE_CONTEXT_CHARS = 90000
 
+with open(os.path.abspath(__file__), "rb") as _f:
+    CODE_HASH = hashlib.sha256(_f.read()).hexdigest()[:16]
 _mem_cache = {}
 _cache_lock = threading.Lock()
 
@@ -57,16 +59,26 @@ def pick_model():
     if MODEL:
         return MODEL
     try:
-        ids = {m.get("id") for m in _http_json("GET", BASE_URL + "/models", timeout=30).get("data", [])}
+        data = _http_json("GET", BASE_URL + "/models", timeout=30).get("data", [])
+        ids = sorted({m.get("id") for m in data if isinstance(m, dict) and isinstance(m.get("id"), str)})
     except Exception as e:  # noqa: BLE001
         print(f"model listing failed: {e}", file=sys.stderr)
-        ids = set()
+        return PREFERRED_MODELS[0]  # not locked in; listing is retried on the next call
+    canon = lambda x: re.sub(r"[^a-z0-9]", "", x.lower().split("/")[-1])
+    chosen = None
     for m in PREFERRED_MODELS:
         if m in ids:
-            MODEL = m
+            chosen = m
             break
-    else:
-        MODEL = sorted(ids)[0] if ids else PREFERRED_MODELS[0]
+        match = [i for i in ids if canon(i) == canon(m) and ":" not in i]
+        if match:
+            chosen = match[0]
+            break
+    if not chosen:
+        chatty = [i for i in ids if re.search(r"sonnet|opus|gpt-4|gpt-5|gemini.*pro", i, re.I)
+                  and not re.search(r"embed|image|audio|tts|realtime|mini|nano|haiku|:", i, re.I)]
+        chosen = (chatty or [i for i in ids if not re.search(r"embed|image|audio|tts|haiku", i, re.I)] or ids or PREFERRED_MODELS)[0]
+    MODEL = chosen
     print(f"using model {MODEL}", file=sys.stderr)
     return MODEL
 
@@ -94,7 +106,7 @@ def chat_json(system, user, deadline, max_tokens=4000):
         "response_format": {"type": "json_object"},
     }
     last = None
-    for attempt in range(3):
+    for attempt in range(4):
         remaining = deadline - time.time()
         if remaining < 5:
             break
@@ -106,6 +118,9 @@ def chat_json(system, user, deadline, max_tokens=4000):
             last = f"HTTP {e.code}: {e.read()[:300]!r}"
             if e.code == 400 and "response_format" in body:
                 body.pop("response_format")
+            elif e.code == 429 or e.code >= 500:
+                time.sleep(min(4 * (attempt + 1), max(0, deadline - time.time() - 10)))
+                continue
         except Exception as e:  # noqa: BLE001
             last = repr(e)
         time.sleep(1 + attempt)
@@ -161,6 +176,9 @@ CONTAINER_RE = re.compile(
 )
 
 
+AGREEMENT_TITLE_RE = re.compile(r"^[A-Z0-9 ,.'&()\-—]*\bAGREEMENT\b[A-Z0-9 ,.'&()\-—]*$")
+
+
 def segment(text):
     lines = text.splitlines()
     raw = []  # (start_line_idx, end_line_idx_exclusive)
@@ -178,6 +196,8 @@ def segment(text):
         first = next((l.strip() for l in chunk_lines if l.strip()), "")
         if not first:
             continue
+        if not CONTAINER_RE.match(first) and AGREEMENT_TITLE_RE.match(first):
+            container = ""
         if CONTAINER_RE.match(first):
             # container title may span two heading lines (EXHIBIT A / ORDER FORM No. 1)
             if segs and segs[-1]["is_container"] and segs[-1]["end"] == s and len(segs[-1]["text"]) < 80:
@@ -298,16 +318,20 @@ our not no all each per such than then within before after under upon may will m
 party parties agreement section rule position language days day months month year years written notice""".split())
 
 
+GENERIC = {"term", "terms", "general", "services", "service", "commitments", "provisions", "other"}
+
+
 def keyword_hits(rules, segs):
     """Cheap backstop so a missed Stage A window does not silently drop a clause."""
     out = {}
     for i, r in enumerate(rules):
-        words = re.findall(r"[a-z][a-z\-]{3,}", (rule_heading(r) + " " + rule_heading(r)).lower())
-        words = [w for w in words if w not in STOP]
+        words = re.findall(r"[a-z][a-z\-]{3,}", rule_heading(r).lower())
+        words = [w for w in words if w not in STOP and w not in GENERIC]
+        pats = [re.compile(r"\b" + re.escape(w) + r"\b") for w in words]
         ids = set()
         for s in segs:
-            head = s["heading"].lower()
-            if words and any(w in head for w in words):
+            head = s["heading"].lower()[:80]
+            if any(p.search(head) for p in pats):
                 ids.add(s["id"])
         out[str(rule_id(r, i))] = ids
     return out
@@ -324,9 +348,9 @@ Statuses (exactly one):
 - "accepted": the effective terms conform to the rule's starting position (substance matters, not wording; equivalent phrasing is fine; terms more favorable to our company on every axis the rule addresses also conform).
 - "fallback": the effective terms do not meet the starting position but conform to one of the approved fallbacks. Give its 1-based index and text.
 - "not accepted": the effective terms fall outside the starting position and every fallback, or hit the not-acceptable language. Propose concrete changes (replacement language, and deletion/amendment of any overriding order-form/exhibit/amendment term) such that, once made, the rule would be "accepted" against the starting position.
-- "not applicable": nothing in the draft addresses the rule's subject at all. Exception: if the rule's starting position is that the subject should be absent / our paper is silent, then absence means "accepted", and presence of the forbidden term means evaluate normally.
+- "not applicable": the rule maps to no clause in the draft — nothing in any operative document addresses the rule's subject. This holds even if the rule's position is that the subject should be absent or a fallback is to drop the clause: no clause means "not applicable". If a clause on the subject exists, evaluate it normally (e.g. a clause granting something the rule says we never offer is "not accepted").
 
-Clauses about other subjects are irrelevant to this rule; do not let them drive the status. Fallbacks that consist of dropping the clause apply only if the clause is actually absent.
+Clauses about other subjects are irrelevant to this rule; do not let them drive the status.
 
 Citations: cite every segment you relied on by its id, with a short verbatim quote copied exactly from that segment (max ~40 words). For "not applicable" citations may be empty.
 
@@ -337,28 +361,41 @@ Respond with JSON only:
  "citations": [{"segment": "S12", "quote": "..."}],
  "proposed_changes": null or "specific redline language (required when not accepted)"}"""
 
-PRECEDENCE_RE = re.compile(r"precedence|controls?\b|prevail|supersed|notwithstanding|amend", re.I)
+PRECEDENCE_RE = re.compile(
+    r"order of precedence|shall control|will control|\bcontrols\b|\bprevails?\b|supersed|notwithstanding|"
+    r"\bamend(?:s|ed|ment)\b|in the event of (?:any )?conflict|of no (?:further )?force|for reference only",
+    re.I)
+
+
+def precedence_rank(seg):
+    t = seg["text"]
+    strong = len(re.findall(r"notwithstanding|supersed|\bamend|of no (?:further )?force|for reference only", t, re.I))
+    in_override_doc = 1 if re.search(r"AMENDMENT|ADDENDUM|SIDE LETTER|RIDER", seg["container"], re.I) else 0
+    return (-in_override_doc, -strong, len(t))
 
 
 def stage_b(meta, rule, idx, cand, prec, deadline):
-    ordered = sorted(cand, key=lambda s: s["start"])
-    ctx, size = [], 0
-    for s in ordered:
+    # cand is already in priority order; keep as many as fit, then show in document order
+    kept, size = [], 0
+    for s in cand:
         r = render_seg(s)
         if size + len(r) > RULE_CONTEXT_CHARS:
-            break
-        ctx.append(r)
+            continue
+        kept.append(s)
         size += len(r)
+    ordered = sorted(kept, key=lambda s: s["start"])
+    ctx = [render_seg(s) for s in ordered]
     cand_ids = {s["id"] for s in ordered}
     prec_ctx, psize = [], 0
-    for s in prec:
+    for s in prec:  # strongest override language first
         if s["id"] in cand_ids:
             continue
         r = render_seg(s)
-        if psize + len(r) > 15000:
-            break
-        prec_ctx.append(r)
+        if psize + len(r) > 20000:
+            continue
+        prec_ctx.append((s["start"], r))
         psize += len(r)
+    prec_ctx = [r for _, r in sorted(prec_ctx)]
 
     user = (
         "PLAYBOOK CONTEXT:\n" + json.dumps({k: v for k, v in meta.items() if k in ("name", "preamble", "scope")}, indent=1)
@@ -375,19 +412,34 @@ def normalize_status(s):
     s = (s or "").strip().lower().replace("_", " ").replace("-", " ")
     if s in STATUSES:
         return s
-    if "not" in s and "appl" in s:
+    if "appl" in s or s in ("n/a", "na", "none", "absent", "missing"):
         return "not applicable"
-    if "not" in s and "accept" in s or "reject" in s:
-        return "not accepted"
-    if "fallback" in s:
+    if "fallback" in s or "alternate" in s:
         return "fallback"
-    if "accept" in s:
+    if re.search(r"\bnot\b|unaccept|reject|non.?conform|deviat|fail", s):
+        return "not accepted"
+    if "accept" in s or "conform" in s:
         return "accepted"
     return "not accepted"
 
 
+_PUNCT = str.maketrans({"\u2018": "'", "\u2019": "'", "\u201c": '"', "\u201d": '"', "\u2013": "-",
+                        "\u2014": "-", "\u00a0": " ", "\u2026": "..."})
+
+
 def norm_ws(t):
-    return re.sub(r"\s+", " ", t or "").strip().lower()
+    t = (t or "").translate(_PUNCT).strip().strip('."\'').replace("...", " ")
+    return re.sub(r"\s+", " ", t).strip().lower()
+
+
+def quote_found(quote, text):
+    q, t = norm_ws(quote), norm_ws(text)
+    if not q:
+        return False
+    if q in t:
+        return True
+    parts = [p.strip() for p in re.split(r"\s*\.\.\.\s*|\s*…\s*", (quote or "").translate(_PUNCT)) if len(p.strip()) > 8]
+    return bool(parts) and all(norm_ws(p) in t for p in parts)
 
 
 def finalize(rule, idx, res, seg_by_id, text_norm):
@@ -414,7 +466,7 @@ def finalize(rule, idx, res, seg_by_id, text_norm):
         quote = (c.get("quote") or "").strip()
         if not seg:
             continue
-        verified = norm_ws(quote) in norm_ws(seg["text"]) if quote else False
+        verified = quote_found(quote, seg["text"])
         cites.append({
             "section": seg_label(seg),
             "lines": f"{seg['start'] + 1}-{seg['end']}",
@@ -442,7 +494,8 @@ def finalize(rule, idx, res, seg_by_id, text_norm):
 
 def review(contract):
     meta, rules, pb_name = load_playbook()
-    key = hashlib.sha256((json.dumps(rules, sort_keys=True) + json.dumps(meta, sort_keys=True) + "\0" + contract).encode()).hexdigest()
+    pick_model()
+    key = hashlib.sha256((CODE_HASH + MODEL + json.dumps(rules, sort_keys=True) + json.dumps(meta, sort_keys=True) + "\0" + contract).encode()).hexdigest()
     with _cache_lock:
         if key in _mem_cache:
             return _mem_cache[key]
@@ -459,7 +512,8 @@ def review(contract):
     seg_by_id = {s["id"]: s for s in segs}
     hits, a_failed = stage_a(rules, segs, deadline - 150)
     kw = keyword_hits(rules, segs)
-    prec = [s for s in segs if PRECEDENCE_RE.search(s["text"])]
+    prec = sorted((s for s in segs if PRECEDENCE_RE.search(s["text"])), key=precedence_rank)
+    override_docs = [s for s in segs if re.search(r"AMENDMENT|ADDENDUM|SIDE LETTER", s["container"] or s["heading"], re.I)]
     intro = {}  # container label -> id of its opening segment (carries status like "superseded")
     for s_ in segs:
         if s_["container"] and s_["container"] not in intro:
@@ -469,15 +523,21 @@ def review(contract):
     def run(i):
         r = rules[i]
         k = str(rule_id(r, i))
-        cand_ids = hits.get(k, set()) | kw.get(k, set())
-        cand = [seg_by_id[c] for c in cand_ids]
-        cand_ids = set(cand_ids) | {intro[c["container"]] for c in cand if c["container"] in intro}
-        cand = [seg_by_id[c] for c in cand_ids]
+        primary = sorted((seg_by_id[c] for c in hits.get(k, set())), key=lambda s: s["start"])
+        intros = sorted({intro[c["container"]] for c in primary if c["container"] in intro} - {c["id"] for c in primary})
+        secondary = sorted((seg_by_id[c] for c in kw.get(k, set()) - hits.get(k, set())), key=lambda s: s["start"])
+        # priority: located clauses, their document headers, then any amendment text, then keyword backstop
+        cand, seen = [], set()
+        for s_ in primary + [seg_by_id[i] for i in intros] + override_docs + secondary:
+            if s_["id"] not in seen:
+                seen.add(s_["id"])
+                cand.append(s_)
         try:
             res = stage_b(meta, r, i, cand, prec, deadline)
             return finalize(r, i, res, seg_by_id, text_norm), True
         except Exception as e:  # noqa: BLE001
             print(f"stage B rule {k} failed: {e}", file=sys.stderr)
+            cand = primary or secondary
             fb = {
                 "status": "not accepted" if cand else "not applicable",
                 "reasoning": "Automated review could not complete for this rule; "
