@@ -113,6 +113,9 @@ def chat_json(system, user, deadline, max_tokens=4000):
         try:
             out = _http_json("POST", BASE_URL + "/chat/completions", body, timeout=min(150, remaining))
             content = out["choices"][0]["message"]["content"] or ""
+            cost = (out.get("usage") or {}).get("cost")
+            if cost:
+                print(f"llm cost {cost:.4f}", file=sys.stderr)
             return _extract_json(content)
         except urllib.error.HTTPError as e:
             last = f"HTTP {e.code}: {e.read()[:300]!r}"
