@@ -184,6 +184,9 @@ def segment(text):
                 container = segs[-1]["heading"] + " > " + first
             else:
                 container = first
+                sub = [l.strip() for l in chunk_lines if l.strip()][1:2]
+                if sub and len(sub[0]) <= 120 and not HEADING_RE.match(sub[0]):
+                    container = f"{first} — {sub[0]}"
             is_container = True
         else:
             is_container = False
@@ -315,6 +318,7 @@ def keyword_hits(rules, segs):
 STAGE_B_SYSTEM = """You are a senior contracts lawyer reviewing an inbound draft against ONE rule of your company's playbook.
 
 Decide the rule's status on the EFFECTIVE terms of the draft: read the body clause together with every order form, exhibit, schedule, amendment, and precedence or "notwithstanding" clause provided. A later or controlling document that changes the term changes the effective term. If any controlling document pushes the term outside the approved positions, the effective term is outside them.
+Only operative documents count. Material the draft itself marks as superseded, terminated, expired, of no force or effect, a prior agreement, a draft, or attached for reference only does NOT form part of the effective terms; ignore it for the status (you may mention it). Likewise a provision limited by its own terms to a narrow scope (e.g. one exhibit's subject) still counts for that scope.
 
 Statuses (exactly one):
 - "accepted": the effective terms conform to the rule's starting position (substance matters, not wording; equivalent phrasing is fine; terms more favorable to our company on every axis the rule addresses also conform).
@@ -456,12 +460,18 @@ def review(contract):
     hits, a_failed = stage_a(rules, segs, deadline - 150)
     kw = keyword_hits(rules, segs)
     prec = [s for s in segs if PRECEDENCE_RE.search(s["text"])]
+    intro = {}  # container label -> id of its opening segment (carries status like "superseded")
+    for s_ in segs:
+        if s_["container"] and s_["container"] not in intro:
+            intro[s_["container"]] = s_["id"]
     text_norm = norm_ws(contract)
 
     def run(i):
         r = rules[i]
         k = str(rule_id(r, i))
         cand_ids = hits.get(k, set()) | kw.get(k, set())
+        cand = [seg_by_id[c] for c in cand_ids]
+        cand_ids = set(cand_ids) | {intro[c["container"]] for c in cand if c["container"] in intro}
         cand = [seg_by_id[c] for c in cand_ids]
         try:
             res = stage_b(meta, r, i, cand, prec, deadline)
